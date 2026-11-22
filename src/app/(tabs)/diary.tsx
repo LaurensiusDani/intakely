@@ -1,4 +1,3 @@
-import { randomUUID } from "expo-crypto";
 import { router, useFocusEffect } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -8,6 +7,7 @@ import { Screen } from "../../components/Screen";
 import { WaterTracker } from "../../components/WaterTracker";
 import { dayLabel, shiftMonth, startOfMonth, todayInJakarta } from "../../diary/calendar";
 import { dailyProtein, diaryNumber, macroFields, parseDiaryDecimal, portionUnit, validPortionQuantity, type DiaryTarget, type Entry } from "../../diary/nutrition";
+import { createDiaryRecordId } from "../../diary/recordId";
 import { createEntry, getDiaryTarget, listDiaryMonth } from "../../services/ApiService";
 import { useSession } from "../../session";
 
@@ -134,7 +134,7 @@ export default function DiaryScreen() {
     setSaving(true);
     setSaveError("");
     try {
-      const id = draftIds.current.get(day) ?? randomUUID().replace(/-/g, "").slice(0, 15);
+      const id = draftIds.current.get(day) ?? createDiaryRecordId();
       draftIds.current.set(day, id);
       const saved = await createEntry(token, {
         id, owner, loggedOn: day, meal: meal.id, name: name.trim(),

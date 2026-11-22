@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { dailyProtein, nutritionAtQuantity, parseDiaryDecimal, validPortionQuantity } from "../src/diary/nutrition.ts";
+import { createDiaryRecordId } from "../src/diary/recordId.ts";
 import { referenceForEntry, scaledCalories } from "../backend/pb_hooks/diary.js";
 
 const chicken = { name: "Dada Ayam", quantity: 1, caloriesKcal: 20 };
+
+test("client-generated retry IDs satisfy the PocketBase and gateway record ID format", () => {
+  assert.match(createDiaryRecordId(), /^[a-z0-9]{15}$/);
+});
 
 test("new entries preserve the food label while older clients can post total calories", () => {
   assert.deepEqual(referenceForEntry(chicken), { quantity: 1, calories: 20, consumedCalories: 20 });
