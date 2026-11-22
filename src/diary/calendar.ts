@@ -24,6 +24,14 @@ export function dayLabel(day: string) {
   return dayFormatter.format(new Date(day));
 }
 
+export function dayForMonth(year: string, month: number, today: string) {
+  if (!/^\d{4}$/.test(year) || Number(year) < 1 || !Number.isInteger(month) || month < 1 || month > 12) {
+    return null;
+  }
+  const start = `${year}-${String(month).padStart(2, "0")}-01`;
+  return start > today ? null : start === startOfMonth(today) ? today : start;
+}
+
 export function monthWeeks(monthStart: string) {
   const start = new Date(monthStart);
   const leading = (start.getUTCDay() + 6) % 7;
