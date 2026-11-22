@@ -15,6 +15,7 @@ function Navigator() {
         </Stack.Protected>
         <Stack.Protected guard={!!session?.onboardingComplete}>
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="diary-entry/[id]" />
         </Stack.Protected>
       </Stack>
     </>
