@@ -1,4 +1,3 @@
-import { randomUUID } from "expo-crypto";
 import { router, useFocusEffect } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -7,7 +6,8 @@ import { DiaryCalendar } from "../../components/DiaryCalendar";
 import { Screen } from "../../components/Screen";
 import { WaterTracker } from "../../components/WaterTracker";
 import { dayLabel, shiftMonth, startOfMonth, todayInJakarta } from "../../diary/calendar";
-import { dailyProtein, diaryNumber, macroFields, portionUnit, type DiaryTarget, type Entry } from "../../diary/nutrition";
+import { dailyProtein, diaryNumber, macroFields, parseDiaryDecimal, portionUnit, validPortionQuantity, type DiaryTarget, type Entry } from "../../diary/nutrition";
+import { createDiaryRecordId } from "../../diary/recordId";
 import { createEntry, getDiaryTarget, listDiaryMonth } from "../../services/ApiService";
 import { useSession } from "../../session";
 
@@ -20,6 +20,11 @@ const meals = [
 
 type Meal = (typeof meals)[number];
 type MacroField = (typeof macroFields)[number]["id"];
+const portionUnits = [
+  { id: "serving", label: "Servings" },
+  { id: "g", label: "Grams (g)" },
+  { id: "ml", label: "Milliliters (ml)" },
+] as const;
 const calorieIcon = require("../../../Design/Diary_Asset/Diary_YellowFire-Icon.png");
 const proteinIcon = require("../../../Design/Diary_Asset/Diary_StrongArm-Icon.png");
 
@@ -30,6 +35,9 @@ export default function DiaryScreen() {
   const [meal, setMeal] = useState<Meal>(meals[0]);
   const [name, setName] = useState("");
   const [calories, setCalories] = useState("");
+  const [unit, setUnit] = useState<Entry["unit"]>("serving");
+  const [referenceAmount, setReferenceAmount] = useState("1");
+  const [consumedAmount, setConsumedAmount] = useState("1");
   const [macros, setMacros] = useState<Partial<Record<MacroField, string>>>({});
   const [targetResult, setTargetResult] = useState<{ day: string; target: DiaryTarget | null; failed?: boolean }>();
   const [items, setItems] = useState<Entry[]>([]);
@@ -39,6 +47,7 @@ export default function DiaryScreen() {
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   const draftIds = useRef(new Map<string, string>());
+  const saveInFlight = useRef(false);
   const reloadOnReturn = useRef(false);
   const token = session?.token;
   const owner = session?.record.id;
@@ -83,7 +92,7 @@ export default function DiaryScreen() {
   }, [reload]));
 
   function selectDay(date: string) {
-    if (saving || date > todayInJakarta() || date === day) return;
+    if (saveInFlight.current || date > todayInJakarta() || date === day) return;
     if (startOfMonth(date) !== monthStart) {
       setItems([]);
       setLoading(true);
@@ -93,36 +102,50 @@ export default function DiaryScreen() {
     setDay(date);
   }
 
+  const referenceQuantity = parseDiaryDecimal(referenceAmount);
+  const quantity = parseDiaryDecimal(consumedAmount);
+  const referenceCaloriesKcal = parseDiaryDecimal(calories);
+  const validPortions = validPortionQuantity(referenceQuantity) && validPortionQuantity(quantity);
+  const validCalories = Number.isFinite(referenceCaloriesKcal) && referenceCaloriesKcal >= 0 && referenceCaloriesKcal <= 100000;
+  const caloriesKcal = quantity / referenceQuantity * referenceCaloriesKcal;
+
   async function addFood() {
-    if (!token || !owner || saving || loading || day > todayInJakarta()) return;
-    const value = Number(calories.trim().replace(",", "."));
-    if (!name.trim() || !calories.trim() || !Number.isFinite(value) || value < 0 || value > 100000) {
+    if (!token || !owner || saveInFlight.current || loading || day > todayInJakarta()) return;
+    if (!name.trim() || !validCalories) {
       setSaveError("Enter a food name and a calorie amount from 0 to 100,000.");
+      return;
+    }
+    if (!validPortions || caloriesKcal > 100000) {
+      setSaveError("Use amounts from 0.001 to 100,000, with no more than 100,000 kcal consumed.");
       return;
     }
     const nutrition: Partial<Record<MacroField, number>> = {};
     for (const { id, label } of macroFields) {
       const raw = macros[id]?.trim();
       if (!raw) continue;
-      const grams = Number(raw.replace(",", "."));
+      const grams = parseDiaryDecimal(raw);
       if (!Number.isFinite(grams) || grams < 0 || grams > 100000) {
         setSaveError(`Enter ${label.toLowerCase()} from 0 to 100,000 g, or leave it blank.`);
         return;
       }
       nutrition[id] = grams;
     }
+    saveInFlight.current = true;
     setSaving(true);
     setSaveError("");
     try {
-      const id = draftIds.current.get(day) ?? randomUUID().replace(/-/g, "").slice(0, 15);
+      const id = draftIds.current.get(day) ?? createDiaryRecordId();
       draftIds.current.set(day, id);
       const saved = await createEntry(token, {
         id, owner, loggedOn: day, meal: meal.id, name: name.trim(),
-        quantity: 1, unit: "serving", caloriesKcal: value, ...nutrition,
+        quantity, unit, caloriesKcal, referenceQuantity, referenceCaloriesKcal, ...nutrition,
       });
       draftIds.current.clear();
       setName("");
       setCalories("");
+      setUnit("serving");
+      setReferenceAmount("1");
+      setConsumedAmount("1");
       setMacros({});
       setExpandedMeal(meal.id);
       setItems((current) => [...current.filter((item) => item.id !== saved.id), saved]);
@@ -130,6 +153,7 @@ export default function DiaryScreen() {
     } catch (problem) {
       setSaveError(problem instanceof Error ? problem.message : "Could not save. Try again.");
     } finally {
+      saveInFlight.current = false;
       setSaving(false);
     }
   }
@@ -234,18 +258,52 @@ export default function DiaryScreen() {
         <TextInput accessibilityLabel="Food name" className={input} placeholder="Food name"
           value={name} onChangeText={(value) => { draftIds.current.clear(); setName(value); }}
           maxLength={100} editable={!saving} />
-        <TextInput accessibilityLabel="Calories in one serving" className={input} placeholder="Calories in one serving"
+        <Text className="font-semibold text-forest-deep">Portion unit</Text>
+        <View className="flex-row flex-wrap gap-2">
+          {portionUnits.map((option) => (
+            <Pressable key={option.id} accessibilityRole="button" accessibilityState={{ selected: unit === option.id }}
+              disabled={saving} onPress={() => {
+                if (unit === option.id) return;
+                draftIds.current.clear();
+                setUnit(option.id);
+                const amount = option.id === "serving" ? "1" : "100";
+                setReferenceAmount(amount);
+                setConsumedAmount(amount);
+              }}
+              className={unit === option.id ? "rounded-full bg-forest px-3 py-2" : "rounded-full bg-forest-soft px-3 py-2"}>
+              <Text className={unit === option.id ? "text-white" : "text-forest-deep"}>{option.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View className="flex-row gap-2">
+          <View className="min-w-0 flex-1 gap-1">
+            <Text className="text-sm font-semibold text-forest-deep">Reference ({unit})</Text>
+            <TextInput accessibilityLabel={`Reference amount in ${unit}`} className={input}
+              value={referenceAmount} onChangeText={(value) => { draftIds.current.clear(); setReferenceAmount(value); }}
+              keyboardType="decimal-pad" editable={!saving} />
+          </View>
+          <View className="min-w-0 flex-1 gap-1">
+            <Text className="text-sm font-semibold text-forest-deep">Consumed ({unit})</Text>
+            <TextInput accessibilityLabel={`Consumed amount in ${unit}`} className={input}
+              value={consumedAmount} onChangeText={(value) => { draftIds.current.clear(); setConsumedAmount(value); }}
+              keyboardType="decimal-pad" editable={!saving} />
+          </View>
+        </View>
+        <TextInput accessibilityLabel="Calories per reference amount" className={input} placeholder="Calories per reference amount"
           value={calories} onChangeText={(value) => { draftIds.current.clear(); setCalories(value); }}
           keyboardType="decimal-pad" editable={!saving} />
-        <Text className="text-sm text-forest-deep">Optional nutrition per serving</Text>
+        <Text className="text-sm text-forest-deep">Optional nutrition per reference amount</Text>
         <View className="flex-row gap-2">
           {macroFields.map(({ id, label }) => (
-            <TextInput key={id} accessibilityLabel={`${label} in grams per serving`}
+            <TextInput key={id} accessibilityLabel={`${label} in grams per reference amount`}
               className="min-w-0 flex-1 rounded-xl border border-forest/30 bg-white px-2 py-3 text-forest-deep"
               placeholder={`${label} (g)`} value={macros[id] ?? ""} keyboardType="decimal-pad" editable={!saving}
               onChangeText={(value) => { draftIds.current.clear(); setMacros((current) => ({ ...current, [id]: value })); }} />
           ))}
         </View>
+        {validPortions && validCalories && caloriesKcal <= 100000 && (
+          <Text className="font-semibold text-forest-deep">{diaryNumber.format(caloriesKcal)} kcal to log</Text>
+        )}
         {saveError ? <Text accessibilityRole="alert" className="text-red-700">{saveError}</Text> : null}
         <Pressable accessibilityRole="button" onPress={addFood} disabled={saving || loading}
           className="items-center rounded-xl bg-forest p-4 disabled:opacity-65">

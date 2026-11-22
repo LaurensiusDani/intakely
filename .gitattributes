@@ -1,1 +1,2 @@
 /backend/*.sh text eol=lf
+*.pdf binary

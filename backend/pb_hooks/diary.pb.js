@@ -1,15 +1,13 @@
 onRecordCreateRequest((e) => {
-    const { validQuantity } = require(__hooks + "/diary.js");
+    const { referenceForEntry } = require(__hooks + "/diary.js");
     const data = e.requestInfo().body;
-    if (!Number.isFinite(data.caloriesKcal) || data.caloriesKcal < 0 || data.caloriesKcal > 100000) {
-        throw new BadRequestError("Enter calories as a number.");
-    }
-    if (!validQuantity(data.quantity)) {
-        throw new BadRequestError("Enter a valid serving amount.");
+    const reference = referenceForEntry(data);
+    if (!reference) {
+        throw new BadRequestError("Enter valid reference calories and portion amounts.");
     }
 
-    e.record.set("referenceQuantity", data.quantity);
-    e.record.set("referenceCaloriesKcal", data.caloriesKcal);
+    e.record.set("referenceQuantity", reference.quantity);
+    e.record.set("referenceCaloriesKcal", reference.calories);
     for (const field of ["referenceProteinG", "referenceCarbsG", "referenceFatG"]) {
         const amount = data[field];
         if (amount != null && (!Number.isFinite(amount) || amount < 0 || amount > 100000)) {
@@ -18,7 +16,7 @@ onRecordCreateRequest((e) => {
         // PocketBase number fields default to zero, so -1 represents an unavailable macro.
         e.record.set(field, amount == null ? -1 : amount);
     }
-    e.record.set("caloriesKcal", data.caloriesKcal);
+    e.record.set("caloriesKcal", reference.consumedCalories);
     return e.next();
 }, "diary_entries");
 

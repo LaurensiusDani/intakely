@@ -1,7 +1,7 @@
-import { randomUUID } from "expo-crypto";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Image, Pressable, Text, TextInput, View } from "react-native";
 import { diaryNumber } from "../diary/nutrition";
+import { createDiaryRecordId } from "../diary/recordId";
 import { createWaterEntry, deleteWaterEntry, listWaterEntries, updateWaterEntry } from "../services/ApiService";
 
 const drop = require("../../Design/Diary_Asset/Diary_Water_BlueWaterDroplet-Icon.png");
@@ -44,7 +44,7 @@ export function WaterTracker({ day, token, owner, targetMl }: { day: string; tok
         setEditing(null);
       } else {
         if (draft.current?.amountMl !== amountMl) {
-          draft.current = { id: randomUUID().replace(/-/g, "").slice(0, 15), amountMl };
+          draft.current = { id: createDiaryRecordId(), amountMl };
         }
         const saved = await createWaterEntry(token, { ...draft.current, owner, loggedOn: day });
         setEntries((current) => [...(current ?? []).filter((item) => item.id !== saved.id), saved]);

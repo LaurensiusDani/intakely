@@ -13,4 +13,15 @@ function scaledCalories(quantity, referenceQuantity, referenceCalories) {
     return quantity / referenceQuantity * referenceCalories;
 }
 
-module.exports = { validDiaryDate, validQuantity, scaledCalories };
+function referenceForEntry(data) {
+    if (!validQuantity(data.quantity)) return null;
+    const hasReference = data.referenceQuantity !== undefined || data.referenceCaloriesKcal !== undefined;
+    const quantity = hasReference ? data.referenceQuantity : data.quantity;
+    const calories = hasReference ? data.referenceCaloriesKcal : data.caloriesKcal;
+    if (!validQuantity(quantity) || !Number.isFinite(calories) || calories < 0 || calories > 100000) return null;
+    const consumedCalories = scaledCalories(data.quantity, quantity, calories);
+    if (consumedCalories > 100000) return null;
+    return { quantity, calories, consumedCalories };
+}
+
+module.exports = { validDiaryDate, validQuantity, scaledCalories, referenceForEntry };

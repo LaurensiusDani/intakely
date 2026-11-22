@@ -70,13 +70,17 @@ assert.equal((await call(targets, { token: other.token })).target.waterMl, 2000)
 
 await call(diary, { method: "POST", token: other.token, body: food, expect: 400 });
 await call(diary, { method: "POST", token, body: { ...food, loggedOn: "2099-01-01" }, expect: 400 });
-await call(diary, { method: "POST", token, body: food });
+const labeledFood = { ...food, quantity: 300, unit: "ml", caloriesKcal: 180, referenceQuantity: 200, referenceCaloriesKcal: 120 };
+await call(diary, { method: "POST", token, body: labeledFood });
 try {
-  await call(diary, { method: "POST", token, body: food, expect: 400 });
-  assert.equal((await call(path, { token })).referenceProteinG, -1);
-  const updated = await call(path, { method: "PATCH", token, body: { quantity: 2 } });
-  assert.equal(updated.caloriesKcal, 44);
-  assert.equal(updated.referenceCaloriesKcal, 22);
+  await call(diary, { method: "POST", token, body: labeledFood, expect: 400 });
+  const initial = await call(path, { token });
+  assert.equal(initial.referenceProteinG, -1);
+  assert.equal(initial.caloriesKcal, 180);
+  const updated = await call(path, { method: "PATCH", token, body: { quantity: 250 } });
+  assert.equal(updated.caloriesKcal, 150);
+  assert.equal(updated.referenceCaloriesKcal, 120);
+  assert.equal(updated.referenceQuantity, 200);
   await call(path, { method: "PATCH", token, body: { quantity: 3, caloriesKcal: 20 }, expect: 400 });
   assert.deepEqual((await call(diary, { token })).items.map((item) => item.id), [id]);
   assert.deepEqual((await call(diary, { token: other.token })).items, []);
