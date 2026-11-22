@@ -76,11 +76,19 @@ export function finishOnboarding(token, body) {
   return request(onboarding, { method: "POST", token, body });
 }
 
-/** @param {string} token @param {string} day A YYYY-MM-DD date. */
-export async function listEntries(token, day) {
-  const filter = encodeURIComponent(`loggedOn = "${day}"`);
-  const data = await request(`${entries}?filter=${filter}&perPage=500`, { token });
-  return data.items;
+/** @param {string} token @param {string} firstDay @param {string} nextMonth */
+export async function listDiaryMonth(token, firstDay, nextMonth) {
+  const filter = encodeURIComponent(`loggedOn >= "${firstDay}" && loggedOn < "${nextMonth}"`);
+  const items = [];
+  let page = 1;
+  let totalPages;
+  do {
+    const data = await request(`${entries}?filter=${filter}&sort=loggedOn,id&perPage=200&page=${page}`, { token });
+    items.push(...data.items);
+    totalPages = data.totalPages;
+    page++;
+  } while (page <= totalPages);
+  return items;
 }
 
 /** @param {string} token @param {{id: string, [field: string]: string | number}} entry */
