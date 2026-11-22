@@ -1,0 +1,1253 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Intakely Nutrition Microservice",
+    "version": "1.0.0",
+    "description": "Kontrak API Tugas 2 JensenHuang (K01). Gunakan tanggal WIB dan akun fiktif untuk demo. Batas Nginx berlaku bersama per kelompok route di gateway, bukan per akun. Signup/login 2 request/detik, route Diary/onboarding 10 request/detik, burst 20 untuk masing-masing kelompok."
+  },
+  "servers": [
+    {
+      "url": "https://jensenhuang.stei.fun"
+    }
+  ],
+  "security": [
+    {
+      "PocketBaseToken": []
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": [
+          "Health"
+        ],
+        "summary": "Periksa kesehatan API publik",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code",
+                    "data"
+                  ]
+                },
+                "example": {
+                  "message": "API is healthy.",
+                  "code": 200,
+                  "data": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/collections/users/records": {
+      "post": {
+        "operationId": "createAccount",
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Buat akun dengan email dan kata sandi",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8
+                  },
+                  "passwordConfirm": {
+                    "type": "string",
+                    "minLength": 8
+                  }
+                },
+                "required": [
+                  "name",
+                  "email",
+                  "password",
+                  "passwordConfirm"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input tidak valid, autentikasi gagal, atau aturan create ditolak."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      }
+    },
+    "/api/collections/users/auth-with-password": {
+      "post": {
+        "operationId": "loginWithPassword",
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Masuk dan dapatkan token sesi",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "identity": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "identity",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "record": {
+                      "$ref": "#/components/schemas/Account"
+                    }
+                  },
+                  "required": [
+                    "token",
+                    "record"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input tidak valid, autentikasi gagal, atau aturan create ditolak."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      }
+    },
+    "/api/intakely/onboarding": {
+      "get": {
+        "operationId": "getOnboardingStatus",
+        "tags": [
+          "Onboarding"
+        ],
+        "summary": "Baca status onboarding akun",
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "completed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "completed"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Butuh token akun yang valid."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      },
+      "post": {
+        "operationId": "saveInitialTargets",
+        "tags": [
+          "Onboarding"
+        ],
+        "summary": "Simpan target awal akun",
+        "description": "Tiga persentase harus berjumlah 100. Jika target sudah tersimpan, request ulang mengembalikan completed=true. BodyDetails opsional menyimpan profil dan berat awal.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "caloriesKcal": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  },
+                  "proteinPct": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "carbsPct": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "fatPct": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "waterMl": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  },
+                  "goalWeightKg": {
+                    "type": "number",
+                    "minimum": 30,
+                    "maximum": 350
+                  },
+                  "body": {
+                    "$ref": "#/components/schemas/BodyDetails"
+                  }
+                },
+                "required": [
+                  "caloriesKcal",
+                  "proteinPct",
+                  "carbsPct",
+                  "fatPct"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "completed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "completed"
+                  ]
+                },
+                "example": {
+                  "completed": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input tidak valid, autentikasi gagal, atau aturan create ditolak."
+          },
+          "401": {
+            "description": "Butuh token akun yang valid."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      }
+    },
+    "/api/intakely/onboarding/estimate": {
+      "post": {
+        "operationId": "estimateTargets",
+        "tags": [
+          "Onboarding"
+        ],
+        "summary": "Hitung estimasi target dewasa",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BodyDetails"
+              },
+              "example": {
+                "age": 24,
+                "heightCm": 175,
+                "weightKg": 68,
+                "sex": "male",
+                "activity": "moderate",
+                "goal": "bulking"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "caloriesKcal": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10000
+                    },
+                    "proteinPct": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "carbsPct": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "fatPct": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "caloriesKcal",
+                    "proteinPct",
+                    "carbsPct",
+                    "fatPct"
+                  ]
+                },
+                "example": {
+                  "caloriesKcal": 2770,
+                  "proteinPct": 30,
+                  "carbsPct": 45,
+                  "fatPct": 25
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input tidak valid, autentikasi gagal, atau aturan create ditolak."
+          },
+          "401": {
+            "description": "Butuh token akun yang valid."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      }
+    },
+    "/api/intakely/diary-targets": {
+      "get": {
+        "operationId": "getDiaryTargets",
+        "tags": [
+          "Diary"
+        ],
+        "summary": "Baca target yang berlaku pada tanggal Diary",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Tanggal kalender WIB (YYYY-MM-DD). Untuk Diary, gunakan hari ini atau tanggal lampau."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "target": {
+                      "oneOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "caloriesKcal": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 100000
+                            },
+                            "proteinGrams": {
+                              "type": "number"
+                            },
+                            "waterMl": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "caloriesKcal",
+                            "proteinGrams",
+                            "waterMl"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "target"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input tidak valid, autentikasi gagal, atau aturan create ditolak."
+          },
+          "401": {
+            "description": "Butuh token akun yang valid."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      }
+    },
+    "/api/collections/diary_entries/records": {
+      "get": {
+        "operationId": "listFoodEntries",
+        "tags": [
+          "Diary"
+        ],
+        "summary": "Daftar entri makanan milik akun",
+        "description": "List disaring oleh aturan kepemilikan PocketBase. Query anonim menerima daftar kosong.",
+        "parameters": [
+          {
+            "name": "filter",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "example": "loggedOn = \"2026-11-23\""
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "example": "loggedOn,id"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "example": 30
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FoodEntry"
+                      }
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "perPage": {
+                      "type": "integer"
+                    },
+                    "totalItems": {
+                      "type": "integer"
+                    },
+                    "totalPages": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "page",
+                    "perPage",
+                    "totalItems",
+                    "totalPages"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input tidak valid, autentikasi gagal, atau aturan create ditolak."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      },
+      "post": {
+        "operationId": "createFoodEntry",
+        "tags": [
+          "Diary"
+        ],
+        "summary": "Simpan entri makanan",
+        "description": "Owner harus record.id akun yang login. Kirim kedua field reference atau kosongkan keduanya. Dengan reference, server menghitung ulang caloriesKcal; field caloriesKcal tetap wajib dikirim. Makro opsional dinilai per jumlah acuan dan dikembalikan sebagai -1 bila kosong.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]{15}$"
+                  },
+                  "owner": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]{15}$"
+                  },
+                  "loggedOn": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Tanggal kalender WIB (YYYY-MM-DD). Untuk Diary, gunakan hari ini atau tanggal lampau."
+                  },
+                  "meal": {
+                    "type": "string",
+                    "enum": [
+                      "breakfast",
+                      "lunch",
+                      "dinner",
+                      "snacks"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "quantity": {
+                    "type": "number",
+                    "minimum": 0.001,
+                    "maximum": 100000
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": [
+                      "serving",
+                      "g",
+                      "ml"
+                    ]
+                  },
+                  "caloriesKcal": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100000
+                  },
+                  "referenceQuantity": {
+                    "type": "number",
+                    "minimum": 0.001,
+                    "maximum": 100000
+                  },
+                  "referenceCaloriesKcal": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100000
+                  },
+                  "referenceProteinG": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100000
+                  },
+                  "referenceCarbsG": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100000
+                  },
+                  "referenceFatG": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100000
+                  }
+                },
+                "required": [
+                  "owner",
+                  "loggedOn",
+                  "meal",
+                  "name",
+                  "quantity",
+                  "unit",
+                  "caloriesKcal"
+                ],
+                "dependentRequired": {
+                  "referenceQuantity": [
+                    "referenceCaloriesKcal"
+                  ],
+                  "referenceCaloriesKcal": [
+                    "referenceQuantity"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input tidak valid, autentikasi gagal, atau aturan create ditolak."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      }
+    },
+    "/api/collections/diary_entries/records/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{15}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getFoodEntry",
+        "tags": [
+          "Diary"
+        ],
+        "summary": "Detail entri makanan milik akun",
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodEntry"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record tidak ditemukan atau tidak dapat diakses."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateFoodQuantity",
+        "tags": [
+          "Diary"
+        ],
+        "summary": "Ubah jumlah porsi",
+        "description": "Server mempertahankan basis nutrisi awal dan menghitung ulang kalori.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "quantity": {
+                    "type": "number",
+                    "minimum": 0.001,
+                    "maximum": 100000
+                  }
+                },
+                "required": [
+                  "quantity"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input tidak valid, autentikasi gagal, atau aturan create ditolak."
+          },
+          "404": {
+            "description": "Record tidak ditemukan atau tidak dapat diakses."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteFoodEntry",
+        "tags": [
+          "Diary"
+        ],
+        "summary": "Hapus entri makanan",
+        "responses": {
+          "204": {
+            "description": "Dihapus."
+          },
+          "404": {
+            "description": "Record tidak ditemukan atau tidak dapat diakses."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      }
+    },
+    "/api/collections/water_entries/records": {
+      "get": {
+        "operationId": "listWaterEntries",
+        "tags": [
+          "Diary"
+        ],
+        "summary": "Daftar entri air milik akun",
+        "description": "List disaring oleh aturan kepemilikan PocketBase. Query anonim menerima daftar kosong.",
+        "parameters": [
+          {
+            "name": "filter",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "example": "loggedOn = \"2026-11-23\""
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "example": "loggedOn,id"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "example": 30
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/WaterEntry"
+                      }
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "perPage": {
+                      "type": "integer"
+                    },
+                    "totalItems": {
+                      "type": "integer"
+                    },
+                    "totalPages": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "page",
+                    "perPage",
+                    "totalItems",
+                    "totalPages"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input tidak valid, autentikasi gagal, atau aturan create ditolak."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      },
+      "post": {
+        "operationId": "createWaterEntry",
+        "tags": [
+          "Diary"
+        ],
+        "summary": "Simpan entri air",
+        "description": "Owner harus record.id akun yang login. amountMl dalam bilangan bulat. Gunakan ID opsional yang sama untuk retry dari aplikasi.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]{15}$"
+                  },
+                  "owner": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]{15}$"
+                  },
+                  "loggedOn": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Tanggal kalender WIB (YYYY-MM-DD). Untuk Diary, gunakan hari ini atau tanggal lampau."
+                  },
+                  "amountMl": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  }
+                },
+                "required": [
+                  "owner",
+                  "loggedOn",
+                  "amountMl"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaterEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input tidak valid, autentikasi gagal, atau aturan create ditolak."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      }
+    },
+    "/api/collections/water_entries/records/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{15}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getWaterEntry",
+        "tags": [
+          "Diary"
+        ],
+        "summary": "Detail entri air milik akun",
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaterEntry"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record tidak ditemukan atau tidak dapat diakses."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateWaterAmount",
+        "tags": [
+          "Diary"
+        ],
+        "summary": "Ubah volume air",
+        "description": "Kepemilikan dan tanggal tidak dapat diubah.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amountMl": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  }
+                },
+                "required": [
+                  "amountMl"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaterEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input tidak valid, autentikasi gagal, atau aturan create ditolak."
+          },
+          "404": {
+            "description": "Record tidak ditemukan atau tidak dapat diakses."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteWaterEntry",
+        "tags": [
+          "Diary"
+        ],
+        "summary": "Hapus entri air",
+        "responses": {
+          "204": {
+            "description": "Dihapus."
+          },
+          "404": {
+            "description": "Record tidak ditemukan atau tidak dapat diakses."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "PocketBaseToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Isi header dengan token persis seperti dikembalikan oleh auth-with-password, tanpa awalan Bearer."
+      }
+    },
+    "schemas": {
+      "Account": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{15}$"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "FoodEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{15}$"
+          },
+          "owner": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{15}$"
+          },
+          "loggedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "Tanggal kalender WIB (YYYY-MM-DD). Untuk Diary, gunakan hari ini atau tanggal lampau."
+          },
+          "meal": {
+            "type": "string",
+            "enum": [
+              "breakfast",
+              "lunch",
+              "dinner",
+              "snacks"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.001,
+            "maximum": 100000
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "serving",
+              "g",
+              "ml"
+            ]
+          },
+          "caloriesKcal": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "referenceQuantity": {
+            "type": "number",
+            "minimum": 0.001,
+            "maximum": 100000
+          },
+          "referenceCaloriesKcal": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "referenceProteinG": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 100000
+          },
+          "referenceCarbsG": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 100000
+          },
+          "referenceFatG": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 100000
+          }
+        },
+        "required": [
+          "id",
+          "owner",
+          "loggedOn",
+          "meal",
+          "name",
+          "quantity",
+          "unit",
+          "caloriesKcal",
+          "referenceQuantity",
+          "referenceCaloriesKcal",
+          "referenceProteinG",
+          "referenceCarbsG",
+          "referenceFatG"
+        ]
+      },
+      "WaterEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{15}$"
+          },
+          "owner": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{15}$"
+          },
+          "loggedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "Tanggal kalender WIB (YYYY-MM-DD). Untuk Diary, gunakan hari ini atau tanggal lampau."
+          },
+          "amountMl": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          }
+        },
+        "required": [
+          "id",
+          "owner",
+          "loggedOn",
+          "amountMl"
+        ]
+      },
+      "BodyDetails": {
+        "type": "object",
+        "properties": {
+          "age": {
+            "type": "integer",
+            "minimum": 18,
+            "maximum": 120
+          },
+          "heightCm": {
+            "type": "number",
+            "minimum": 100,
+            "maximum": 250
+          },
+          "weightKg": {
+            "type": "number",
+            "minimum": 30,
+            "maximum": 350
+          },
+          "sex": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female"
+            ]
+          },
+          "activity": {
+            "type": "string",
+            "enum": [
+              "sedentary",
+              "light",
+              "moderate",
+              "high"
+            ]
+          },
+          "goal": {
+            "type": "string",
+            "enum": [
+              "bulking",
+              "cutting",
+              "maintenance"
+            ]
+          }
+        },
+        "required": [
+          "age",
+          "heightCm",
+          "weightKg",
+          "sex",
+          "activity",
+          "goal"
+        ]
+      }
+    }
+  }
+}
