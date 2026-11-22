@@ -27,6 +27,15 @@ export type DiaryTarget = { caloriesKcal: number; proteinGrams: number; waterMl:
 
 export const diaryNumber = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
+export function parseDiaryDecimal(raw: string) {
+  const value = raw.trim();
+  return /^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(value) ? Number(value.replace(",", ".")) : NaN;
+}
+
+export function validPortionQuantity(value: number) {
+  return Number.isFinite(value) && value >= 0.001 && value <= 100000;
+}
+
 export function portionUnit(unit: Entry["unit"], quantity: number) {
   return unit === "serving" && quantity !== 1 ? "servings" : unit;
 }

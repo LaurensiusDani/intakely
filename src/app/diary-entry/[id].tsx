@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Alert, Pressable, Text, TextInput, View } from "react-native";
 import { Screen } from "../../components/Screen";
 import { dayLabel } from "../../diary/calendar";
-import { diaryNumber, mealLabels, nutritionAtQuantity, portionUnit, type Entry } from "../../diary/nutrition";
+import { diaryNumber, mealLabels, nutritionAtQuantity, parseDiaryDecimal, portionUnit, validPortionQuantity, type Entry } from "../../diary/nutrition";
 import { deleteDiaryEntry, getDiaryEntry, updateDiaryServing } from "../../services/ApiService";
 import { useSession } from "../../session";
 
@@ -35,8 +35,8 @@ export default function DiaryEntryScreen() {
     else router.replace("/diary");
   }
 
-  const quantity = Number(quantityInput.trim().replace(",", "."));
-  const valid = Number.isFinite(quantity) && quantity >= 0.001 && quantity <= 100000;
+  const quantity = parseDiaryDecimal(quantityInput);
+  const valid = validPortionQuantity(quantity);
   const preview = entry ? nutritionAtQuantity(entry, valid ? quantity : entry.quantity) : null;
 
   async function save() {
