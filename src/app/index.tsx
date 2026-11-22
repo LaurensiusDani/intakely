@@ -1,3 +1,4 @@
+import { Redirect } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useEffect, useState, type ReactNode } from "react";
 import {
@@ -52,7 +53,7 @@ function AccountInput({
 }
 
 export default function AccountScreen() {
-  const { setSession } = useSession();
+  const { session, setSession } = useSession();
   const { height } = useWindowDimensions();
   const compact = height < 760;
   const [registering, setRegistering] = useState(false);
@@ -77,6 +78,10 @@ export default function AccountScreen() {
     });
     return () => back.remove();
   }, [registering, saving]);
+
+  if (session) {
+    return <Redirect href={session.onboardingComplete ? "/diary" : "/onboarding"} />;
+  }
 
   async function submit() {
     if (saving) return;

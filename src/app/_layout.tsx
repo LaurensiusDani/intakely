@@ -9,9 +9,7 @@ function Navigator() {
     <>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Protected guard={!session}>
-          <Stack.Screen name="index" />
-        </Stack.Protected>
+        <Stack.Screen name="index" />
         <Stack.Protected guard={!!session && !session.onboardingComplete}>
           <Stack.Screen name="onboarding" />
         </Stack.Protected>
