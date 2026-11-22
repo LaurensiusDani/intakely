@@ -4,6 +4,7 @@ const baseUrl = (
 
 const users = "/api/collections/users";
 const entries = "/api/collections/diary_entries/records";
+const water = "/api/collections/water_entries/records";
 const onboarding = "/api/intakely/onboarding";
 
 /**
@@ -76,22 +77,80 @@ export function finishOnboarding(token, body) {
   return request(onboarding, { method: "POST", token, body });
 }
 
-/** @param {string} token @param {string} day A YYYY-MM-DD date. */
-export async function listEntries(token, day) {
-  const filter = encodeURIComponent(`loggedOn = "${day}"`);
-  const data = await request(`${entries}?filter=${filter}&perPage=500`, { token });
-  return data.items;
+/** @param {string} token @param {string} firstDay @param {string} nextMonth */
+export async function listDiaryMonth(token, firstDay, nextMonth) {
+  return listDiaryRecords(token, entries, `loggedOn >= "${firstDay}" && loggedOn < "${nextMonth}"`);
+}
+
+/** @param {string} token @param {string} day */
+export function listWaterEntries(token, day) {
+  return listDiaryRecords(token, water, `loggedOn = "${day}"`);
+}
+
+/** @param {string} token @param {string} path @param {string} filter */
+async function listDiaryRecords(token, path, filter) {
+  const items = [];
+  let page = 1;
+  let totalPages;
+  do {
+    const data = await request(`${path}?filter=${encodeURIComponent(filter)}&sort=loggedOn,id&perPage=200&page=${page}`, { token });
+    items.push(...data.items);
+    totalPages = data.totalPages;
+    page++;
+  } while (page <= totalPages);
+  return items;
 }
 
 /** @param {string} token @param {{id: string, [field: string]: string | number}} entry */
 export async function createEntry(token, entry) {
+  return createDiaryRecord(token, entries, entry);
+}
+
+/** @param {string} token @param {{id: string, loggedOn: string, owner: string, amountMl: number}} entry */
+export function createWaterEntry(token, entry) {
+  return createDiaryRecord(token, water, entry);
+}
+
+/** @param {string} token @param {string} path @param {{id: string, [field: string]: string | number}} entry */
+async function createDiaryRecord(token, path, entry) {
   try {
-    return await request(entries, { method: "POST", token, body: entry });
+    return await request(path, { method: "POST", token, body: entry });
   } catch (saveError) {
-    const existing = await request(`${entries}/${entry.id}`, { token }).catch(() => null);
+    const existing = await request(`${path}/${entry.id}`, { token }).catch(() => null);
     if (existing && Object.entries(entry).every(([key, value]) => existing[key] === value)) {
       return existing;
     }
     throw saveError;
   }
+}
+
+/** @param {string} token @param {string} id */
+export function getDiaryEntry(token, id) {
+  return request(`${entries}/${encodeURIComponent(id)}`, { token });
+}
+
+/** @param {string} token @param {string} id @param {number} quantity */
+export function updateDiaryServing(token, id, quantity) {
+  return request(`${entries}/${encodeURIComponent(id)}`, { method: "PATCH", token, body: { quantity } });
+}
+
+/** @param {string} token @param {string} id */
+export function deleteDiaryEntry(token, id) {
+  return request(`${entries}/${encodeURIComponent(id)}`, { method: "DELETE", token });
+}
+
+/** @param {string} token @param {string} id @param {number} amountMl */
+export function updateWaterEntry(token, id, amountMl) {
+  return request(`${water}/${encodeURIComponent(id)}`, { method: "PATCH", token, body: { amountMl } });
+}
+
+/** @param {string} token @param {string} id */
+export function deleteWaterEntry(token, id) {
+  return request(`${water}/${encodeURIComponent(id)}`, { method: "DELETE", token });
+}
+
+/** @param {string} token @param {string} day */
+export async function getDiaryTarget(token, day) {
+  const data = await request(`/api/intakely/diary-targets?day=${encodeURIComponent(day)}`, { token });
+  return data.target;
 }

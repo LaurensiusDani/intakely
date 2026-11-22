@@ -46,7 +46,7 @@ The STB's systemd `cloudflared` service forwards requests to host port 80. If Cl
 
 If the `intakely-pocketbase:latest` image is already present on the STB, start it with `sudo docker compose up -d --no-build`. Rebuild when the PocketBase image contents change.
 
-After deployment, verify onboarding and the Diary API with two fictional accounts. From the laptop, run the smoke check below. It leaves two test accounts and their completed setups in PocketBase and removes its test meal.
+After deployment, verify onboarding, dated targets, food serving changes, and water logging with two fictional accounts. From the laptop, run the smoke check below. It leaves two test accounts and their completed setups in PocketBase and removes its test food and water entries.
 
 ```powershell
 node backend/smoke-diary.mjs https://jensenhuang.stei.fun
