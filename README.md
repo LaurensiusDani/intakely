@@ -23,6 +23,8 @@ Aplikasi memakai origin `https://jensenhuang.stei.fun` secara default. Untuk ser
 
 Cloudflare Tunnel meneruskan trafik API HTTPS ke Nginx pada `127.0.0.1:80`. Nginx meneruskan route yang diizinkan ke PocketBase 0.40.6, yang menyimpan data di SQLite melalui volume Compose `pocketbase_data`. Gateway dan PocketBase berjalan sebagai kontainer. Konektor `cloudflared` berjalan sebagai layanan systemd pada host STB.
 
+Pencarian makanan memanggil USDA FoodData Central dengan API key dari [api.data.gov](https://api.data.gov/signup/). Simpan key di `/mnt/storage/intakely/.env` sebagai `USDA_API_KEY=...`; file ini tidak masuk git. Tanpa key, endpoint pencarian menjawab 503 dan fitur lain tetap berjalan.
+
 Dari laptop, salin `compose.yaml` dan direktori `backend/` ke `/mnt/storage/intakely` di STB ARM64. Lalu jalankan di STB:
 
 ```sh

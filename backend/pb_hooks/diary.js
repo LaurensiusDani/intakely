@@ -1,3 +1,5 @@
+const units = ["serving", "g", "ml"];
+
 function validDiaryDate(day, now = Date.now()) {
     if (typeof day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
     const parsed = new Date(day + "T00:00:00Z");
@@ -13,15 +15,31 @@ function scaledCalories(quantity, referenceQuantity, referenceCalories) {
     return quantity / referenceQuantity * referenceCalories;
 }
 
+// Converts an amount logged in `unit` to the unit the reference nutrition is stated in.
+// A named serving converts to grams or milliliters when the food defines its size.
+function amountInReferenceUnit(quantity, unit, referenceUnit, servingQuantity) {
+    if (unit === referenceUnit) return quantity;
+    if (unit === "serving" && referenceUnit !== "serving" && servingQuantity > 0) return quantity * servingQuantity;
+    return null;
+}
+
 function referenceForEntry(data) {
     if (!validQuantity(data.quantity)) return null;
     const hasReference = data.referenceQuantity !== undefined || data.referenceCaloriesKcal !== undefined;
     const quantity = hasReference ? data.referenceQuantity : data.quantity;
     const calories = hasReference ? data.referenceCaloriesKcal : data.caloriesKcal;
     if (!validQuantity(quantity) || !Number.isFinite(calories) || calories < 0 || calories > 100000) return null;
-    const consumedCalories = scaledCalories(data.quantity, quantity, calories);
+
+    const unit = data.referenceUnit ?? data.unit;
+    const servingQuantity = data.servingQuantity ?? 0;
+    if (!units.includes(unit) || (servingQuantity !== 0 && (!validQuantity(servingQuantity) || unit === "serving"))) {
+        return null;
+    }
+    const consumed = amountInReferenceUnit(data.quantity, data.unit, unit, servingQuantity);
+    if (consumed === null) return null;
+    const consumedCalories = scaledCalories(consumed, quantity, calories);
     if (consumedCalories > 100000) return null;
-    return { quantity, calories, consumedCalories };
+    return { quantity, calories, consumedCalories, unit, servingQuantity };
 }
 
-module.exports = { validDiaryDate, validQuantity, scaledCalories, referenceForEntry };
+module.exports = { validDiaryDate, validQuantity, scaledCalories, amountInReferenceUnit, referenceForEntry };
