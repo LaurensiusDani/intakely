@@ -8,6 +8,15 @@ onRecordCreateRequest((e) => {
 
     e.record.set("referenceQuantity", reference.quantity);
     e.record.set("referenceCaloriesKcal", reference.calories);
+    e.record.set("referenceUnit", reference.unit);
+    e.record.set("servingQuantity", reference.servingQuantity);
+    const servingLabel = typeof data.servingLabel === "string" ? data.servingLabel.trim() : "";
+    if (servingLabel.length > 100) throw new BadRequestError("Serving labels can have up to 100 characters.");
+    e.record.set("servingLabel", reference.servingQuantity ? servingLabel : "");
+    if (data.fdcId != null && !(Number.isInteger(data.fdcId) && data.fdcId > 0)) {
+        throw new BadRequestError("Choose a food from the search results.");
+    }
+    e.record.set("fdcId", data.fdcId ?? 0);
     for (const field of ["referenceProteinG", "referenceCarbsG", "referenceFatG"]) {
         const amount = data[field];
         if (amount != null && (!Number.isFinite(amount) || amount < 0 || amount > 100000)) {
@@ -21,15 +30,22 @@ onRecordCreateRequest((e) => {
 }, "diary_entries");
 
 onRecordUpdateRequest((e) => {
-    const { validQuantity, scaledCalories } = require(__hooks + "/diary.js");
+    const { validQuantity, scaledCalories, amountInReferenceUnit } = require(__hooks + "/diary.js");
     const data = e.requestInfo().body;
-    if (Object.keys(data).join() !== "quantity" || !validQuantity(data.quantity)) {
+    const keys = Object.keys(data);
+    if (!keys.includes("quantity") || keys.some((key) => key !== "quantity" && key !== "unit") || !validQuantity(data.quantity)) {
         throw new BadRequestError("Enter a valid serving amount.");
     }
-    const calories = scaledCalories(data.quantity, e.record.getFloat("referenceQuantity"), e.record.getFloat("referenceCaloriesKcal"));
+    const unit = data.unit ?? e.record.getString("unit");
+    const amount = amountInReferenceUnit(
+        data.quantity, unit, e.record.getString("referenceUnit"), e.record.getFloat("servingQuantity"),
+    );
+    if (amount === null) throw new BadRequestError("This food can't be logged in that unit.");
+    const calories = scaledCalories(amount, e.record.getFloat("referenceQuantity"), e.record.getFloat("referenceCaloriesKcal"));
     if (!Number.isFinite(calories) || calories > 100000) {
         throw new BadRequestError("This serving is outside the supported calorie range.");
     }
+    e.record.set("unit", unit);
     e.record.set("caloriesKcal", calories);
     return e.next();
 }, "diary_entries");

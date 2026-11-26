@@ -21,6 +21,10 @@ export type Entry = {
   caloriesKcal: number;
   referenceQuantity?: number;
   referenceCaloriesKcal?: number;
+  referenceUnit?: "serving" | "g" | "ml";
+  servingQuantity?: number;
+  servingLabel?: string;
+  fdcId?: number;
 } & Partial<Record<(typeof macroFields)[number]["id"], number>>;
 
 export type DiaryTarget = { caloriesKcal: number; proteinGrams: number; waterMl: number | null };
@@ -40,8 +44,29 @@ export function portionUnit(unit: Entry["unit"], quantity: number) {
   return unit === "serving" && quantity !== 1 ? "servings" : unit;
 }
 
-export function nutritionAtQuantity(entry: Entry, quantity = entry.quantity) {
-  const factor = quantity / (entry.referenceQuantity || entry.quantity);
+/** Units an entry can be logged in: its reference unit, plus a named serving when the food defines one. */
+export function entryUnits(entry: Entry): Entry["unit"][] {
+  const referenceUnit = entry.referenceUnit || entry.unit;
+  return entry.servingQuantity && referenceUnit !== "serving" ? ["serving", referenceUnit] : [referenceUnit];
+}
+
+function amountInReferenceUnit(entry: Entry, quantity: number, unit: Entry["unit"]) {
+  return unit === "serving" && (entry.referenceUnit || entry.unit) !== "serving" ? quantity * (entry.servingQuantity ?? 0) : quantity;
+}
+
+export function quantityInUnit(entry: Entry, quantity: number, from: Entry["unit"], to: Entry["unit"]) {
+  if (from === to) return quantity;
+  const amount = amountInReferenceUnit(entry, quantity, from);
+  return to === "serving" ? amount / (entry.servingQuantity ?? 1) : amount;
+}
+
+export function portionText(entry: Entry, quantity = entry.quantity, unit = entry.unit) {
+  const text = `${diaryNumber.format(quantity)} ${portionUnit(unit, quantity)}`;
+  return unit === "serving" && entry.servingLabel ? `${text} (${entry.servingLabel})` : text;
+}
+
+export function nutritionAtQuantity(entry: Entry, quantity = entry.quantity, unit = entry.unit) {
+  const factor = amountInReferenceUnit(entry, quantity, unit) / (entry.referenceQuantity || entry.quantity);
   const macro = (field: (typeof macroFields)[number]["id"]) => {
     const value = entry[field];
     return value !== undefined && value >= 0 ? value * factor : null;

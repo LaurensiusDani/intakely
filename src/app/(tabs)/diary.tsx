@@ -6,7 +6,7 @@ import { DiaryCalendar } from "../../components/DiaryCalendar";
 import { Screen } from "../../components/Screen";
 import { WaterTracker } from "../../components/WaterTracker";
 import { dayLabel, shiftMonth, startOfMonth, todayInJakarta } from "../../diary/calendar";
-import { dailyProtein, diaryNumber, macroFields, parseDiaryDecimal, portionUnit, validPortionQuantity, type DiaryTarget, type Entry } from "../../diary/nutrition";
+import { dailyProtein, diaryNumber, macroFields, parseDiaryDecimal, portionText, validPortionQuantity, type DiaryTarget, type Entry } from "../../diary/nutrition";
 import { createDiaryRecordId } from "../../diary/recordId";
 import { createEntry, getDiaryTarget, listDiaryMonth } from "../../services/ApiService";
 import { useSession } from "../../session";
@@ -224,7 +224,7 @@ export default function DiaryScreen() {
                 size={22} tintColor="#102127"
               />
             </Pressable>
-            {expanded && groupItems.length > 0 && (
+            {expanded && (
               <View className="border-t border-forest/15 px-4">
                 {groupItems.map((item) => (
                   <Pressable key={item.id} accessibilityRole="button" accessibilityHint="Opens food details"
@@ -232,12 +232,21 @@ export default function DiaryScreen() {
                       reloadOnReturn.current = true;
                       router.push({ pathname: "/diary-entry/[id]", params: { id: item.id } });
                     }}
-                    className="min-h-12 flex-row items-center justify-between gap-2 py-2">
-                    <Text className="flex-1 text-forest-deep">{item.name} · {diaryNumber.format(item.quantity)} {portionUnit(item.unit, item.quantity)}</Text>
+                    className="min-h-12 flex-row items-center justify-between gap-2 border-b border-forest/10 py-2">
+                    <Text className="flex-1 text-forest-deep">{item.name} · {portionText(item)}</Text>
                     <Text className="text-forest-deep">{diaryNumber.format(item.caloriesKcal)} kcal</Text>
                     <SymbolView name={{ android: "chevron_right", ios: "chevron.right", web: "chevron_right" }} size={18} tintColor="#0F4D39" />
                   </Pressable>
                 ))}
+                <Pressable accessibilityRole="button" disabled={saving || loading || !!loadError}
+                  onPress={() => {
+                    reloadOnReturn.current = true;
+                    router.push({ pathname: "/food-search", params: { day, meal: group.id } });
+                  }}
+                  className="min-h-12 flex-row items-center gap-2 py-2 disabled:opacity-50">
+                  <SymbolView name={{ android: "search", ios: "magnifyingglass", web: "search" }} size={18} tintColor="#176B50" />
+                  <Text className="font-semibold text-forest">Search foods to add</Text>
+                </Pressable>
               </View>
             )}
           </View>

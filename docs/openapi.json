@@ -469,6 +469,67 @@
         }
       }
     },
+    "/api/intakely/foods": {
+      "get": {
+        "operationId": "searchFoods",
+        "tags": [
+          "Foods"
+        ],
+        "summary": "Cari referensi makanan dari USDA FoodData Central",
+        "description": "Nilai gizi per 100 g, atau per 100 ml untuk minuman bermerek. Makro bernilai null bila sumber tidak menyediakannya. Hasil tanpa energi dalam kcal tidak ditampilkan. Gunakan field hasil sebagai salinan nilai saat membuat diary entry.",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "foods": {
+                      "type": "array",
+                      "maxItems": 25,
+                      "items": {
+                        "$ref": "#/components/schemas/FoodReference"
+                      }
+                    }
+                  },
+                  "required": [
+                    "foods"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Query kurang dari 2 atau lebih dari 100 karakter."
+          },
+          "401": {
+            "description": "Butuh token akun yang valid."
+          },
+          "429": {
+            "description": "Batas request Nginx terlampaui."
+          },
+          "502": {
+            "description": "USDA FoodData Central tidak merespons dengan benar."
+          },
+          "503": {
+            "description": "API key USDA belum dikonfigurasi atau kuotanya habis."
+          }
+        }
+      }
+    },
     "/api/collections/diary_entries/records": {
       "get": {
         "operationId": "listFoodEntries",
@@ -566,7 +627,7 @@
           "Diary"
         ],
         "summary": "Simpan entri makanan",
-        "description": "Owner harus record.id akun yang login. Kirim kedua field reference atau kosongkan keduanya. Dengan reference, server menghitung ulang caloriesKcal; field caloriesKcal tetap wajib dikirim. Makro opsional dinilai per jumlah acuan dan dikembalikan sebagai -1 bila kosong.",
+        "description": "Owner harus record.id akun yang login. Kirim kedua field reference atau kosongkan keduanya. Dengan reference, server menghitung ulang caloriesKcal; field caloriesKcal tetap wajib dikirim. Makro opsional dinilai per jumlah acuan dan dikembalikan sebagai -1 bila kosong. Bila unit serving dan referenceUnit g atau ml, server mengonversi quantity dengan servingQuantity sebelum menghitung kalori.",
         "requestBody": {
           "required": true,
           "content": {
@@ -643,6 +704,31 @@
                     "type": "number",
                     "minimum": 0,
                     "maximum": 100000
+                  },
+                  "referenceUnit": {
+                    "type": "string",
+                    "enum": [
+                      "serving",
+                      "g",
+                      "ml"
+                    ],
+                    "description": "Satuan basis nutrisi. Default sama dengan unit. Makanan USDA memakai g atau ml dengan referenceQuantity 100."
+                  },
+                  "servingQuantity": {
+                    "type": "number",
+                    "minimum": 0.001,
+                    "maximum": 100000,
+                    "description": "Jumlah referenceUnit dalam satu serving bernama, misalnya 158 g untuk 1 cup. 0 berarti tidak ada serving bernama. Hanya boleh diisi bila referenceUnit g atau ml."
+                  },
+                  "servingLabel": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "description": "Nama serving, misalnya \"1 cup, cooked\". Disimpan hanya bila servingQuantity diisi."
+                  },
+                  "fdcId": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "ID USDA FoodData Central dari hasil /api/intakely/foods. Kosongkan untuk makanan manual."
                   }
                 },
                 "required": [
@@ -728,8 +814,8 @@
         "tags": [
           "Diary"
         ],
-        "summary": "Ubah jumlah porsi",
-        "description": "Server mempertahankan basis nutrisi awal dan menghitung ulang kalori.",
+        "summary": "Ubah jumlah dan satuan porsi",
+        "description": "Server mempertahankan basis nutrisi awal dan menghitung ulang kalori. unit boleh diubah ke referenceUnit, atau ke serving bila entri punya servingQuantity; kombinasi lain ditolak dengan 400.",
         "requestBody": {
           "required": true,
           "content": {
@@ -741,6 +827,14 @@
                     "type": "number",
                     "minimum": 0.001,
                     "maximum": 100000
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": [
+                      "serving",
+                      "g",
+                      "ml"
+                    ]
                   }
                 },
                 "required": [
@@ -1149,6 +1243,31 @@
             "type": "number",
             "minimum": -1,
             "maximum": 100000
+          },
+          "referenceUnit": {
+            "type": "string",
+            "enum": [
+              "serving",
+              "g",
+              "ml"
+            ],
+            "description": "Satuan basis nutrisi. Default sama dengan unit. Makanan USDA memakai g atau ml dengan referenceQuantity 100."
+          },
+          "servingQuantity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000,
+            "description": "Jumlah referenceUnit dalam satu serving bernama, misalnya 158 g untuk 1 cup. 0 berarti tidak ada serving bernama. Hanya boleh diisi bila referenceUnit g atau ml."
+          },
+          "servingLabel": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Nama serving, misalnya \"1 cup, cooked\". Disimpan hanya bila servingQuantity diisi."
+          },
+          "fdcId": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "ID USDA FoodData Central sumber nilai gizi. 0 untuk makanan yang dicatat manual."
           }
         },
         "required": [
@@ -1164,7 +1283,11 @@
           "referenceCaloriesKcal",
           "referenceProteinG",
           "referenceCarbsG",
-          "referenceFatG"
+          "referenceFatG",
+          "referenceUnit",
+          "servingQuantity",
+          "servingLabel",
+          "fdcId"
         ]
       },
       "WaterEntry": {
@@ -1246,6 +1369,83 @@
           "sex",
           "activity",
           "goal"
+        ]
+      },
+      "FoodReference": {
+        "type": "object",
+        "properties": {
+          "fdcId": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "brand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "referenceUnit": {
+            "type": "string",
+            "enum": [
+              "g",
+              "ml"
+            ]
+          },
+          "referenceQuantity": {
+            "type": "number",
+            "const": 100
+          },
+          "referenceCaloriesKcal": {
+            "type": "number",
+            "minimum": 0
+          },
+          "referenceProteinG": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "referenceCarbsG": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "referenceFatG": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "servingQuantity": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Berat atau volume porsi default dalam referenceUnit. null bila sumber tidak punya porsi."
+          },
+          "servingLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "fdcId",
+          "name",
+          "brand",
+          "referenceUnit",
+          "referenceQuantity",
+          "referenceCaloriesKcal",
+          "referenceProteinG",
+          "referenceCarbsG",
+          "referenceFatG",
+          "servingQuantity",
+          "servingLabel"
         ]
       }
     }

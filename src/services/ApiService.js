@@ -129,9 +129,15 @@ export function getDiaryEntry(token, id) {
   return request(`${entries}/${encodeURIComponent(id)}`, { token });
 }
 
-/** @param {string} token @param {string} id @param {number} quantity */
-export function updateDiaryServing(token, id, quantity) {
-  return request(`${entries}/${encodeURIComponent(id)}`, { method: "PATCH", token, body: { quantity } });
+/** @param {string} token @param {string} id @param {number} quantity @param {string} unit */
+export function updateDiaryServing(token, id, quantity, unit) {
+  return request(`${entries}/${encodeURIComponent(id)}`, { method: "PATCH", token, body: { quantity, unit } });
+}
+
+/** @param {string} token @param {string} query */
+export async function searchFoods(token, query) {
+  const data = await request(`/api/intakely/foods?query=${encodeURIComponent(query)}`, { token });
+  return data.foods;
 }
 
 /** @param {string} token @param {string} id */
