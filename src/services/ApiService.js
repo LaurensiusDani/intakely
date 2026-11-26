@@ -7,6 +7,14 @@ const entries = "/api/collections/diary_entries/records";
 const water = "/api/collections/water_entries/records";
 const onboarding = "/api/intakely/onboarding";
 
+/** @type {(token: string) => void} */
+let onUnauthorized = () => {};
+
+/** @param {(token: string) => void} handler */
+export function setUnauthorizedHandler(handler) {
+  onUnauthorized = handler;
+}
+
 /**
  * @param {string} path
  * @param {{ method?: string, body?: object, token?: string }} options
@@ -27,6 +35,9 @@ async function request(path, { method = "GET", body, token } = {}) {
       body: body && JSON.stringify(body),
     });
 
+    if (response.status === 401 && token) {
+      onUnauthorized(token);
+    }
     if (response.status === 429) {
       throw new Error("Too many requests. Wait a moment and try again.");
     }
@@ -59,12 +70,25 @@ export function signUp({ name, email, password }) {
 
 /** @param {string} email @param {string} password */
 export async function signIn(email, password) {
-  const session = await request(users + "/auth-with-password", {
+  return withOnboarding(await request(users + "/auth-with-password", {
     method: "POST",
     body: { identity: email, password },
-  });
-  const status = await request(onboarding, { token: session.token });
-  return { ...session, onboardingComplete: status.completed };
+  }));
+}
+
+/** @param {string} token */
+export async function refreshSession(token) {
+  return withOnboarding(await request(users + "/auth-refresh", { method: "POST", token }));
+}
+
+/** @param {{ token: string, record: { id: string, name?: string, email?: string } }} auth */
+async function withOnboarding({ token, record }) {
+  const status = await request(onboarding, { token });
+  return {
+    token,
+    record: { id: record.id, name: record.name, email: record.email },
+    onboardingComplete: status.completed,
+  };
 }
 
 /** @param {string} token @param {object} body */
