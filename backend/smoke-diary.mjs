@@ -10,15 +10,21 @@ const onboarding = "/api/intakely/onboarding";
 const water = "/api/collections/water_entries/records";
 
 async function call(path, { method = "GET", token, body, expect = 200 } = {}) {
-  const response = await fetch(base + path, {
-    method,
-    signal: AbortSignal.timeout(10000),
-    headers: {
-      ...(token && { Authorization: token }),
-      ...(body && { "Content-Type": "application/json" }),
-    },
-    body: body && JSON.stringify(body),
-  });
+  let response;
+  // The gateway rate limits each client; on a fast link this script can outrun it.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (attempt) await new Promise((resolve) => setTimeout(resolve, 1000));
+    response = await fetch(base + path, {
+      method,
+      signal: AbortSignal.timeout(10000),
+      headers: {
+        ...(token && { Authorization: token }),
+        ...(body && { "Content-Type": "application/json" }),
+      },
+      body: body && JSON.stringify(body),
+    });
+    if (response.status !== 429) break;
+  }
   assert.equal(response.status, expect, `${method} ${path}`);
   return response.status === 204 ? null : response.json();
 }
