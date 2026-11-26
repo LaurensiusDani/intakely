@@ -40,8 +40,8 @@ Skrip build mengunduh ZIP PocketBase di host, memverifikasi SHA-256, lalu memban
 
 ```sh
 npm run lint
-npx tsc --noEmit
-node --test tests/*.test.mjs
+npm run typecheck
+npm test
 curl -fsS https://jensenhuang.stei.fun/api/health
 ```
 
