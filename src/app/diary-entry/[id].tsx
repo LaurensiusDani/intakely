@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Alert, Pressable, Text, TextInput, View } from "react-native";
 import { Screen } from "../../components/Screen";
 import { dayLabel } from "../../diary/calendar";
-import { diaryNumber, mealLabels, nutritionAtQuantity, parseDiaryDecimal, portionUnit, validPortionQuantity, type Entry } from "../../diary/nutrition";
+import { diaryNumber, entryUnits, mealLabels, nutritionAtQuantity, parseDiaryDecimal, portionUnit, quantityInUnit, validPortionQuantity, type Entry } from "../../diary/nutrition";
 import { deleteDiaryEntry, getDiaryEntry, updateDiaryServing } from "../../services/ApiService";
 import { useSession } from "../../session";
 
@@ -12,6 +12,7 @@ export default function DiaryEntryScreen() {
   const { session } = useSession();
   const [entry, setEntry] = useState<Entry | null>(null);
   const [quantityInput, setQuantityInput] = useState("");
+  const [unit, setUnit] = useState<Entry["unit"]>("serving");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -25,6 +26,7 @@ export default function DiaryEntryScreen() {
         if (!active) return;
         setEntry(result);
         setQuantityInput(String(result.quantity));
+        setUnit(result.unit);
       })
       .catch((problem) => { if (active) setError(problem instanceof Error ? problem.message : "Could not open this entry."); });
     return () => { active = false; };
@@ -37,7 +39,14 @@ export default function DiaryEntryScreen() {
 
   const quantity = parseDiaryDecimal(quantityInput);
   const valid = validPortionQuantity(quantity);
-  const preview = entry ? nutritionAtQuantity(entry, valid ? quantity : entry.quantity) : null;
+  const preview = entry ? (valid ? nutritionAtQuantity(entry, quantity, unit) : nutritionAtQuantity(entry)) : null;
+  const units = entry ? entryUnits(entry) : [];
+
+  function changeUnit(next: Entry["unit"]) {
+    if (!entry || next === unit) return;
+    if (valid) setQuantityInput(String(Math.round(quantityInUnit(entry, quantity, unit, next) * 1000) / 1000));
+    setUnit(next);
+  }
 
   async function save() {
     if (!entry || !token || busy) return;
@@ -52,7 +61,7 @@ export default function DiaryEntryScreen() {
     setError("");
     setBusy(true);
     try {
-      await updateDiaryServing(token, id, quantity);
+      await updateDiaryServing(token, id, quantity, unit);
       close();
     } catch (problem) {
       setError(problem instanceof Error ? problem.message : "Could not update this entry.");
@@ -87,12 +96,28 @@ export default function DiaryEntryScreen() {
             <Text className="text-forest-deep">{mealLabels[entry.meal]} · {dayLabel(entry.loggedOn)}</Text>
           </View>
           <View className="gap-2 rounded-2xl bg-forest-soft p-4">
-            <Text className="text-base font-bold text-forest-deep">Serving amount</Text>
+            <Text className="text-base font-bold text-forest-deep">Amount</Text>
+            {units.length > 1 && (
+              <View accessibilityRole="radiogroup" accessibilityLabel="Unit" className="flex-row gap-2">
+                {units.map((option) => (
+                  <Pressable key={option} accessibilityRole="radio" accessibilityState={{ checked: unit === option }}
+                    disabled={busy} onPress={() => changeUnit(option)}
+                    className={unit === option ? "rounded-full bg-forest px-3 py-2" : "rounded-full bg-white px-3 py-2"}>
+                    <Text className={unit === option ? "text-white" : "text-forest-deep"}>
+                      {option === "serving" ? "Servings" : option === "g" ? "Grams (g)" : "Milliliters (ml)"}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
             <View className="flex-row items-center gap-3 rounded-xl border border-forest/25 bg-white px-3">
-              <TextInput accessibilityLabel="Serving amount" keyboardType="decimal-pad" value={quantityInput}
+              <TextInput accessibilityLabel={`Amount in ${portionUnit(unit, 2)}`} keyboardType="decimal-pad" value={quantityInput}
                 onChangeText={setQuantityInput} editable={!busy} className="min-h-12 flex-1 text-lg text-forest-deep" />
-              <Text className="font-semibold text-forest-deep">{portionUnit(entry.unit, valid ? quantity : entry.quantity)}</Text>
+              <Text className="font-semibold text-forest-deep">{portionUnit(unit, valid ? quantity : entry.quantity)}</Text>
             </View>
+            {unit === "serving" && entry.servingLabel && entry.servingQuantity ? (
+              <Text className="text-sm text-forest-deep">1 serving = {entry.servingLabel} ({diaryNumber.format(entry.servingQuantity)} {entry.referenceUnit})</Text>
+            ) : null}
           </View>
           <View className="gap-2 rounded-2xl border border-forest/15 bg-[#FFFCF7] p-4">
             <Text accessibilityRole="header" className="text-lg font-bold text-[#102127]">Nutritional Information</Text>
@@ -110,7 +135,7 @@ export default function DiaryEntryScreen() {
           </View>
           <Pressable accessibilityRole="button" disabled={busy} onPress={() => { void save(); }}
             className="min-h-12 items-center justify-center rounded-xl bg-forest disabled:opacity-50">
-            <Text className="font-bold text-white">{busy ? "Please wait…" : "Save serving"}</Text>
+            <Text className="font-bold text-white">{busy ? "Please wait…" : "Save amount"}</Text>
           </Pressable>
           <Pressable accessibilityRole="button" disabled={busy}
             onPress={() => Alert.alert("Delete food?", `Remove ${entry.name} from ${mealLabels[entry.meal]}?`, [
